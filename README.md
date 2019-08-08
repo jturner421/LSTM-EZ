@@ -11,8 +11,8 @@ This code requires:
 python 3.6 or above (I use PyCharm IDE)
 
 installed packages:
-- numpy
-- pandas
-- matplotlib
-- sklearn
-- keras
+- numpy 1.15.4
+- pandas0.24.1
+- matplotlib 3.0.2
+- sklearn 
+- Keras 2.2.4
