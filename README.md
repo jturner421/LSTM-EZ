@@ -1,5 +1,8 @@
 # LSTM-EZ
 Flexible keras-based code to analyze sequence data using LSTM neural network. 
+
+This code is described in my blog AI voyager (http://aivoyager.com/home/LSTM-EZ).
+
 Illustrates the use of keras parameters such as "units" (= number of neurons), features and timesteps. 
 The point is that if you have some sequence data and you want to quickly plug into an LSTM model 
 (and you are frustrated by trying to follow Jason Brownlee's lovely but incomplete examples
