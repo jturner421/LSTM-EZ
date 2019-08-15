@@ -3,8 +3,8 @@
 # https://machinelearningmastery.com/multivariate-time-series-forecasting-lstms-keras/
 
 # This is the cleaned up version for github. The development version LSTM_equity_dev1
-# is saved elsewhere (not online).
-import sys
+# is saved elsewhere (not online). for dataframe to numpy array switches see white notebook pg 31
+
 import numpy as np
 import pandas as pd
 from pandas import read_csv
@@ -20,11 +20,11 @@ from keras.layers import LSTM
 # borrowed from MLM
 def series_to_supervised(data, n_in=1, n_out=1, dropnan=True):
     n_vars = 1 if type(data) is list else data.shape[1]
-    df = DataFrame(data)
+    df = DataFrame(data) # this *puts back* basic (0,1,2,...) index col and col headings
     cols, names = list(), list()
 # input sequence (t-n, ... t-1)
     for i in range(n_in, 0, -1):
-        cols.append(df.shift(i))
+        cols.append(df.shift(i)) # cols is now a pd dataframe
         names += [('var%d(t-%d)' % (j+1, i)) for j in range(n_vars)]
 # forecast sequence (t, t+1, ... t+n)
     for i in range(0, n_out):
@@ -65,23 +65,25 @@ def series_to_supervised(data, n_in=1, n_out=1, dropnan=True):
 # You can fool with that if you want to but no guarantees.
 
 n_train=150
-timesteps=5
+timesteps=3
 features=6
-predict=1
+neurons=50
+predict=1 # this model only predicts one timestep into the future
+epochs=50 # typically 50
 
 # load data
+# note: by specifying index_col=0, the first column, containing the dates, is not
+#       considered part of the data per say and is stripped off
+#       when dataframe is converted to numpy array with "dataset.values"
+# this is important (among other reasons) because numpy does not like arrays
+# containing different data types.
 dataset = read_csv('NVDA.csv', header=0, index_col=0)
-
-# manually specify column names [generalize this]
-# dataset.columns is set to a list with features (=6 here) elements
-dataset.columns = ['open','high','low','close','adj close','volume']
-
-# summarize first 5 rows
-print(dataset.head(5))
+# use this call instead if your data does not have an index column (such as a column of dates)
+# dataset = read_csv('NVDA_noDates.csv', header=0)
 
 values = dataset.values # this is a numpy array even if numpy not imported
+# values removes column headings and index col - result here is 2D numpy array
 values = values.astype('float32')
-print('shape',values.shape)
 
 scaler = MinMaxScaler(feature_range=(0,1))
 scaled = scaler.fit_transform(values)
@@ -89,8 +91,6 @@ scaled = scaler.fit_transform(values)
 reframed = series_to_supervised(scaled, timesteps, predict)
 
 pd.set_option('display.max_columns', 1000)
-print('reframed.head',reframed.head())
-print('reframed.tail',reframed.tail())
 
 # remove columns that are features which are not to be predicted in the
 # final timestep.
@@ -101,36 +101,35 @@ print('reframed.tail',reframed.tail())
 
 col_list=list(range(timesteps*features+1,(timesteps+1)*features))
 reframed.drop(reframed.columns[col_list], axis=1, inplace=True)
-print('reframed.head \n',reframed.head())
-print('reframed.tail \n',reframed.tail())
 
 # split into train and test sets
 values = reframed.values
+# print('values \n',values)
 train = values[:n_train, :]
 test = values[n_train:, :]
+# test and train are now numpy arrays, not pd dataframes
 
 # split into input and outputs, for python "-1" is last index.
 # ":-1" means all indices except the last one
 train_X, train_y = train[:, :-1], train[:, -1]
 test_X, test_y = test[:, :-1], test[:, -1]
-print('train_X.shape',train_X.shape,'train_y.shape',train_y.shape)
-print('test_X.shape',test_X.shape,'test_y.shape',test_y.shape)
 
 # reshape input to be 3D [samples, timesteps, features] for LSTM
 # cf https://machinelearningmastery.com/time-series-forecasting-long-short-term-memory-network-python/
 # search "Samples/TimeSteps/Features"
 train_X = train_X.reshape((train_X.shape[0], timesteps, features))
 test_X = test_X.reshape((test_X.shape[0], timesteps, features))
-print(train_X.shape, train_y.shape, test_X.shape, test_y.shape)
 
 # design network
+# N.B. in spite of all screwing around with pandaas, the final input to LSTM is simply a numpy array
+# ***not*** a Pandas Dataframe.
 model = Sequential()
-model.add(LSTM(50, input_shape=(train_X.shape[1], train_X.shape[2])))
+model.add(LSTM(neurons, input_shape=(train_X.shape[1], train_X.shape[2])))
 model.add(Dense(1))
 model.compile(loss='mae', optimizer='adam')
 
 # fit network - note shuffle:=True changes nothing since rows in dataset are independent
-history = model.fit(train_X, train_y, epochs=50, batch_size=1, validation_data=(test_X, test_y), verbose=2, shuffle=False)
+history = model.fit(train_X, train_y, epochs=epochs, batch_size=1, validation_data=(test_X, test_y), verbose=2, shuffle=False)
 
 # plot history
 pyplot.plot(history.history['loss'],label='train')
